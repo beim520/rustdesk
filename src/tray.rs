@@ -131,9 +131,18 @@ fn make_tray() -> hbb_common::ResultType<()> {
     };
 
     #[cfg(windows)]
-    std::thread::spawn(move || {
-        start_query_session_count(ipc_sender.clone());
-    });
+    {
+        // ✅ 先克隆给主线程使用，再 move 原始值进子线程
+        let main_ipc_sender = ipc_sender.clone();
+        std::thread::spawn(move || {
+                start_query_session_count(ipc_sender); // move 原始 sender 进线程
+        });
+        // 若配置为隐藏托盘，初始化后立即通过IPC通知事件循环隐藏托盘
+        let hide_tray = crate::ui_interface::get_option(hbb_common::config::keys::OPTION_HIDE_TRAY) == "Y";
+        if hide_tray {
+            main_ipc_sender.send(Data::HideTray(true)).ok(); // ✅ 使用克隆的 sender
+        }
+    }
     #[cfg(windows)]
     let mut last_click = std::time::Instant::now();
     #[cfg(target_os = "macos")]
@@ -141,13 +150,7 @@ fn make_tray() -> hbb_common::ResultType<()> {
         use tao::platform::macos::EventLoopExtMacOS;
         event_loop.set_activation_policy(tao::platform::macos::ActivationPolicy::Accessory);
     }
-    // 若配置为隐藏托盘，初始化后立即通过IPC通知事件循环隐藏托盘
-    let hide_tray = crate::ui_interface::get_option(hbb_common::config::keys::OPTION_HIDE_TRAY) == "Y";
     #[cfg(windows)]
-    if hide_tray {
-        // 通过 IPC 向事件循环发送隐藏托盘指令
-        ipc_sender.send(Data::HideTray(true)).ok();
-    }
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::WaitUntil(
             std::time::Instant::now() + std::time::Duration::from_millis(100),

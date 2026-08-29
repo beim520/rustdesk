@@ -1015,26 +1015,33 @@ pub fn main_set_option(key: String, value: String) {
     // If `is_allow_tls_fallback` and https proxy is used, we need to restart rendezvous mediator.
     // No need to check if https proxy is used, because this option does not change frequently
     // and restarting mediator is safe even https proxy is not used.
-    let is_allow_tls_fallback = key.eq(config::keys::OPTION_ALLOW_INSECURE_TLS_FALLBACK);
-    if is_allow_tls_fallback
-        || key.eq("custom-rendezvous-server")
-        || key.eq(config::keys::OPTION_ALLOW_WEBSOCKET)
-        || key.eq(config::keys::OPTION_DISABLE_UDP)
-        || key.eq("api-server")
-    {
+    let is_allow_tls_fallback = key == config::keys::OPTION_ALLOW_INSECURE_TLS_FALLBACK;
+    let needs_restart = is_allow_tls_fallback
+
+        || key == "custom-rendezvous-server"
+        || key == config::keys::OPTION_ALLOW_WEBSOCKET
+        || key == config::keys::OPTION_DISABLE_UDP
+        || key == "api-server";
+
+    // ✅ 先保存 hide-tray 的判断结果（此时 key 还未被 move）
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let is_hide_tray = key == config::keys::OPTION_HIDE_TRAY;
+
+    // ✅ 统一调用 set_option，只消费一次 key
+    set_option(key, value.clone());
+
+    if needs_restart {
         if is_allow_tls_fallback {
             hbb_common::tls::reset_tls_cache();
         }
-        set_option(key, value.clone());
         #[cfg(target_os = "android")]
         crate::rendezvous_mediator::RendezvousMediator::restart();
         #[cfg(any(target_os = "android", target_os = "ios"))]
         crate::common::test_rendezvous_server();
     } else {
-        set_option(key, value.clone());
         // 检测到 hide-tray 选项变化时，通过 IPC 通知 tray 进程动态隐藏/显示图标
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        if key.eq(config::keys::OPTION_HIDE_TRAY) {
+        if is_hide_tray {
             let hide = value == "Y";
             std::thread::spawn(move || {
                 send_hide_tray_message(hide);
