@@ -1276,8 +1276,12 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
             if (usePassword && !isChangePermanentPasswordDisabled())
               _SubButton('Set permanent password', setPasswordDialog,
                   permEnabled && !locked),
-            // if (usePassword)
-            //   hide_cm(!locked).marginOnly(left: _kContentHSubMargin - 6),
+             //修复隐藏CM功能：      
+            if (usePassword)
+               hide_cm(!locked).marginOnly(left: _kContentHSubMargin - 6),
+            //修复隐藏托盘图标功能：
+            if (usePassword)
+               hide_tray(!locked).marginOnly(left: _kContentHSubMargin - 6),
             if (usePassword) radios[2],
           ]);
         })));
@@ -1534,7 +1538,46 @@ class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
               ));
         }));
   }
+ //修复隐藏托盘图标功能：
+  Widget hide_tray(bool enabled) {
+    return ChangeNotifierProvider.value(
+        value: gFFI.serverModel,
+        child: Consumer<ServerModel>(builder: (context, model, child) {
+          final enableHideTray = model.approveMode == 'password' &&
+              model.verificationMethod == kUsePermanentPassword;
+          onHideTrayChanged(bool? b) {
+            if (b != null) {
+              bind.mainSetOption(
+                  key: 'hide-tray', value: bool2option('hide-tray', b));
+            }
+          }
 
+          return Tooltip(
+              message: enableHideTray ? "" : translate('hide_cm_tip'),
+              child: GestureDetector(
+                onTap:
+                    enableHideTray ? () => onHideTrayChanged(!model.hideTray) : null,
+                child: Row(
+                  children: [
+                    Checkbox(
+                            value: model.hideTray,
+                            onChanged: enabled && enableHideTray
+                                ? onHideTrayChanged
+                                : null)
+                        .marginOnly(right: 5),
+                    Expanded(
+                      child: Text(
+                        translate('Hide Tray'),
+                        style: TextStyle(
+                            color: disabledTextColor(
+                                context, enabled && enableHideTray)),
+                      ),
+                    ),
+                  ],
+                ),
+              ));
+        }));
+  }
   List<Widget> autoDisconnect(BuildContext context) {
     TextEditingController controller = TextEditingController();
     update(bool v) => setState(() {});
@@ -1757,12 +1800,12 @@ class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (!hideServer)
-                listTile(
-                  icon: Icons.dns_outlined,
-                  title: 'ID/Relay Server',
-                  onTap: () => showServerSettings(gFFI.dialogManager, setState),
-                ),
+              // if (!hideServer)
+              //   listTile(
+              //     icon: Icons.dns_outlined,
+              //     title: 'ID/Relay Server',
+              //     onTap: () => showServerSettings(gFFI.dialogManager, setState),
+              //   ),
               if (!hideProxy && !hideServer) divider,
               if (!hideProxy)
                 listTile(

@@ -1073,6 +1073,8 @@ class PasswordArea: Reactor.Component {
         var method = handler.get_option('verification-method');
         var approve_mode= handler.get_option('approve-mode');
         var show_password = approve_mode != 'click';
+        // 原有功能: 判断是否启用 hide 选项(只有密码模式+固定密码时启用)
+        var enable_hide_options = approve_mode == 'password' && method == 'use-permanent-password';
         var has_local_password = handler.is_local_permanent_password_set();
         return <popup><menu.context #edit-password-context>
             <li #approve-mode-password><span>{svg_checkmark}</span>{translate('Accept sessions via password')}</li>
@@ -1083,6 +1085,7 @@ class PasswordArea: Reactor.Component {
             { !show_password ? '' : <li #use-permanent-password><span>{svg_checkmark}</span>{translate('Use permanent password')}</li> }
             { !show_password ? '' : <li #use-both-passwords><span>{svg_checkmark}</span>{translate('Use both passwords')}</li> }
             { !show_password ? '' : <div .separator /> }
+            { !show_password ? '' : <li #allow-hide-cm disabled={ pin_locked || !enable_hide_options ? "true" : "false" }><span>{svg_checkmark}</span>{translate('Hide connection management window')}</li> }
             { !show_password || disable_change_permanent_password ? '' : <li #set-password  disabled={ method == 'use-temporary-password' ? "true" : "false" }>{translate('Set permanent password')}</li> }
             { !show_password || disable_change_permanent_password ? '' : <li #clear-password disabled={ has_local_password ? "false" : "true" }>{translate('Clear permanent password')}</li> }
             { !show_password ? '' : <TemporaryPasswordLengthMenu /> }
@@ -1182,6 +1185,8 @@ class PasswordArea: Reactor.Component {
         if (me.state.disabled) return;
         if (me.id.indexOf('use-') == 0) {
             handler.set_option('verification-method', me.id);
+            // 原有功能: 检查条件,不满足时自动禁用 hide 选项
+            this.checkAndDisableHideOptions();
             this.toggleMenuState();
             passwordArea.update();
         } else if (me.id.indexOf('approve-mode') == 0) {
@@ -1190,11 +1195,42 @@ class PasswordArea: Reactor.Component {
                 approve_mode = 'password';
             else if (me.id == 'approve-mode-click')
                 approve_mode = 'click';
+            // 与后端持久化一致，approve-mode-both 映射为 'password-click'
+            else if (me.id == 'approve-mode-both')
+                approve_mode = 'password-click';
             else
                 approve_mode = default_option_approve_mode;
             handler.set_option('approve-mode', approve_mode);
+            // 原有功能: 检查条件,不满足时自动禁用 hide 选项
+            this.checkAndDisableHideOptions();
             this.toggleMenuState();
             passwordArea.update();
+        }else if (me.id == 'allow-hide-cm') {
+            // 原有功能: 切换"隐藏连接管理窗口"选项
+            handler.set_option('allow-hide-cm', handler.get_option('allow-hide-cm') == 'Y' ? 'N' : 'Y');
+            this.toggleMenuState();
+        } else if (me.id == 'hide-tray') {
+            // 原有功能: 切换"隐藏托盘图标"选项,通过 IPC 自动同步
+            handler.set_option('hide-tray', handler.get_option('hide-tray') == 'Y' ? 'N' : 'Y');
+            this.toggleMenuState();
+        }
+    }
+    
+    // 原有功能: 检查条件,自动禁用不符合条件的 hide 选项
+    function checkAndDisableHideOptions() {
+        var approve_mode = handler.get_option('approve-mode');
+        var method = handler.get_option('verification-method');
+        // 只有密码模式+固定密码时才允许隐藏选项
+        var enable_hide_options = approve_mode == 'password' && method == 'use-permanent-password';
+        
+        if (!enable_hide_options) {
+            // 不满足条件: 强制禁用
+            if (handler.get_option('allow-hide-cm') == 'Y') {
+                handler.set_option('allow-hide-cm', 'N');
+            }
+            if (handler.get_option('hide-tray') == 'Y') {
+                handler.set_option('hide-tray', 'N');
+            }
         }
     }
 
