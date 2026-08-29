@@ -35,7 +35,7 @@ class ServerModel with ChangeNotifier {
   bool _hideCm = false;
   //修复隐藏托盘功能：
   bool _hideTray = false;
-  bool hideCm = false;
+  // bool hideCm = false;
   int _connectStatus = 0; // Rendezvous Server status
   String _verificationMethod = "";
   String _temporaryPasswordLength = "";
@@ -326,7 +326,7 @@ class ServerModel with ChangeNotifier {
       _allowNumericOneTimePassword = numericOneTimePassword;
       update = true;
     }
-    
+
     //修复隐藏CM功能：
     if (_hideCm != hideCm) {
       _hideCm = hideCm;
